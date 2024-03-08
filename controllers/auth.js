@@ -53,26 +53,26 @@ const loginAccount = async (req, res) => {
     const { email, password } = req.body;
     const emailExist = await accountModel.findOne({ email: email });
 
-    if (email) {
-      const comparePassword = await bcrypt.compare(password, emailExist.password);
-      if (comparePassword) {
-        const token = await jwt.sign(
-          { id: emailExist._id },
-          process.env.JWT_SECRET,
-          { expiresIn: "1h" }
-        );
+    if (!email) {
+      return res
+        .status(401)
+        .json({ message: "Email/Password mismatch", success: false });
+    }
 
-        res.header("Authorization", token).json({
-          message: "Logged in successfully",
-          success: true,
-          token,
-          user: emailExist,
-        });
-      } else {
-        return res
-          .status(401)
-          .json({ message: "Email/Password mismatch", success: false });
-      }
+    const comparePassword = await bcrypt.compare(password, emailExist.password);
+    if (comparePassword) {
+      const token = await jwt.sign(
+        { id: emailExist._id },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      res.header("Authorization", token).json({
+        message: "Logged in successfully",
+        success: true,
+        token,
+        user: emailExist,
+      });
     } else {
       return res
         .status(401)
@@ -142,12 +142,16 @@ const verifyOtp = async (req, res) => {
       return res.status(404).json({ message: "Invalid OTP", success: false });
     }
 
-    const date = Date.now()
+    const date = Date.now();
 
-    if(account.otpExpireDate >= date){
-        return res.status(200).json({ message: "OTP verified", otp:otp, success: true });
-    }else{
-        return res.status(404).json({ message: "OTP has expired", success: false });
+    if (account.otpExpireDate >= date) {
+      return res
+        .status(200)
+        .json({ message: "OTP verified", otp: otp, success: true });
+    } else {
+      return res
+        .status(404)
+        .json({ message: "OTP has expired", success: false });
     }
   } catch (err) {
     console.log(err.message);
@@ -157,37 +161,60 @@ const verifyOtp = async (req, res) => {
   }
 };
 
-const resetPassword = async(req, res) =>{
-    try{
-        const otp = req.params.otp
-        if(!otp){
-            return res.status(400).json({message: "Password reset failed", success: false})
-        }
-        const {password, repeatPassword} = req.body
-
-        if(!password || !repeatPassword || password.trim()==="" || repeatPassword.trim()===""){
-            return res.status(400).json({message: "Password field cannot be empty !", success: false})
-        }
-
-        if(password !== repeatPassword){
-            return res.status(403).json({message: "Passwords does not match", success: false})
-        }
-
-        const account = await accountModel.findOne({otp:otp})
-        if(!account){
-            return res.status(404).json({message: "Password reset failed", success: false})
-        }
-
-        account.password = password
-        account.otp = ""
-        account.otpExpireDate = ""
-
-        await account.save()
-
-        return res.status(200).json({message: "Password reset complete", success: true})
-    }catch(err){
-        return res.status(500).json({message: "Error occured !", success: false, error: err.message})
+const resetPassword = async (req, res) => {
+  try {
+    const otp = req.params.otp;
+    if (!otp) {
+      return res
+        .status(400)
+        .json({ message: "Password reset failed", success: false });
     }
-}
+    const { password, repeatPassword } = req.body;
 
-module.exports = { createAccount, loginAccount, forgetPasword, verifyOtp, resetPassword };
+    if (
+      !password ||
+      !repeatPassword ||
+      password.trim() === "" ||
+      repeatPassword.trim() === ""
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Password field cannot be empty !", success: false });
+    }
+
+    if (password !== repeatPassword) {
+      return res
+        .status(403)
+        .json({ message: "Passwords does not match", success: false });
+    }
+
+    const account = await accountModel.findOne({ otp: otp });
+    if (!account) {
+      return res
+        .status(404)
+        .json({ message: "Password reset failed", success: false });
+    }
+
+    account.password = password;
+    account.otp = "";
+    account.otpExpireDate = "";
+
+    await account.save();
+
+    return res
+      .status(200)
+      .json({ message: "Password reset complete", success: true });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ message: "Error occured !", success: false, error: err.message });
+  }
+};
+
+module.exports = {
+  createAccount,
+  loginAccount,
+  forgetPasword,
+  verifyOtp,
+  resetPassword,
+};
